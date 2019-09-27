@@ -1,11 +1,12 @@
+use crate::RNG;
 use argon2rs::{verifier::Encoded, Argon2, Variant};
-use ring::rand::{SecureRandom, SystemRandom};
+use ring::rand::SecureRandom;
 use std::io::Write;
 
 /// Generate a random 32-byte salt value.
-fn random_salt(rng: &SystemRandom) -> [u8; 32] {
+fn random_salt() -> [u8; 32] {
     let mut salt = [0; 32];
-    rng.fill(&mut salt).unwrap();
+    (&*RNG).fill(&mut salt).unwrap();
     salt
 }
 
@@ -38,8 +39,8 @@ pub struct SaltedHash {
 
 impl SaltedHash {
     /// Generate a random salt, then salt and pepper the password
-    pub fn from_password(rng: &SystemRandom, password: &str) -> SaltedHash {
-        let salt = random_salt(rng);
+    pub fn from_password(password: &str) -> SaltedHash {
+        let salt = random_salt();
         let session = argon2_session(salt, password);
         let hash = session.to_u8();
         println!("Hash len: {}", hash.len());
@@ -61,9 +62,8 @@ pub mod test {
     #[test]
     fn test_verify() {
         std::env::set_var(crate::PEPPER, TEST_PEPPER);
-        let rng = SystemRandom::new();
         let password = "some_other_password";
-        let sh = SaltedHash::from_password(&rng, password);
+        let sh = SaltedHash::from_password(password);
         assert_eq!(sh.verify(password), true);
     }
 }

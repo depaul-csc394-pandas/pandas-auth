@@ -21,19 +21,18 @@ static DOMAIN: &'static str = "DOMAIN";
 static PEPPER: &'static str = "PEPPER";
 static COOKIE_KEY: &'static str = "COOKIE_KEY";
 
+lazy_static! {
+    static ref RNG: SystemRandom = SystemRandom::new();
+}
+
 type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type PooledConnection = r2d2::PooledConnection<ConnectionManager<PgConnection>>;
 
-pub fn create_user<C, S>(
-    rng: &SystemRandom,
-    conn: &PooledConnection,
-    username: S,
-    password: S,
-) -> models::User
+pub fn create_user<C, S>(conn: &PooledConnection, username: S, password: S) -> models::User
 where
     S: AsRef<str>,
 {
-    let SaltedHash { salt, hash } = SaltedHash::from_password(rng, password.as_ref());
+    let SaltedHash { salt, hash } = SaltedHash::from_password(password.as_ref());
 
     let new_user = models::NewUser {
         username: username.as_ref().to_string(),
@@ -45,6 +44,17 @@ where
         .values(&new_user)
         .get_result(conn)
         .expect("Error inserting new user")
+}
+
+pub fn verify_user<S>(conn: &PooledConnection, username: S, password: S) -> bool
+where
+    S: AsRef<str>,
+{
+    let user: models::User = schema::users::table
+        .filter(schema::users::username.eq(username.as_ref()))
+        .get_result(conn)
+        .expect("user query");
+    unimplemented!();
 }
 
 fn main() -> std::io::Result<()> {
