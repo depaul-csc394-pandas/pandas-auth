@@ -32,8 +32,8 @@ fn argon2_session(salt: [u8; 32], password: &str) -> Encoded {
 }
 
 pub struct SaltedHash {
-    salt: [u8; 32],
-    hash: Vec<u8>,
+    pub salt: [u8; 32],
+    pub hash: Vec<u8>,
 }
 
 impl SaltedHash {

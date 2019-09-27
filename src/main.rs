@@ -1,12 +1,20 @@
-use actix_identity::{CookieIdentityPolicy, IdentityService};
-use actix_web::{middleware, web, App, HttpServer};
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use diesel::r2d2::{self, ConnectionManager};
-use lazy_static::lazy_static;
-use log::error;
+#[macro_use]
+extern crate diesel;
 
 mod hash;
+mod models;
+mod schema;
+
+use actix_identity::{CookieIdentityPolicy, IdentityService};
+use actix_web::{middleware, web, App, HttpServer};
+use diesel::connection::Connection;
+use diesel::pg::{Pg, PgConnection};
+use diesel::prelude::*;
+use diesel::r2d2::{self, ConnectionManager};
+use hash::SaltedHash;
+use lazy_static::lazy_static;
+use log::error;
+use ring::rand::SystemRandom;
 
 static DATABASE_URL: &'static str = "DATABASE_URL";
 static DOMAIN: &'static str = "DOMAIN";
@@ -14,6 +22,30 @@ static PEPPER: &'static str = "PEPPER";
 static COOKIE_KEY: &'static str = "COOKIE_KEY";
 
 type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
+type PooledConnection = r2d2::PooledConnection<ConnectionManager<PgConnection>>;
+
+pub fn create_user<C, S>(
+    rng: &SystemRandom,
+    conn: &PooledConnection,
+    username: S,
+    password: S,
+) -> models::User
+where
+    S: AsRef<str>,
+{
+    let SaltedHash { salt, hash } = SaltedHash::from_password(rng, password.as_ref());
+
+    let new_user = models::NewUser {
+        username: username.as_ref().to_string(),
+        salt_base64: base64::encode(&salt),
+        argon2_hash: String::from_utf8(hash).expect("hash into utf8"),
+    };
+
+    diesel::insert_into(schema::users::table)
+        .values(&new_user)
+        .get_result(conn)
+        .expect("Error inserting new user")
+}
 
 fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
