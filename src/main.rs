@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate diesel;
 
+mod error;
 mod hash;
 mod models;
 mod resource;
@@ -8,7 +9,6 @@ mod schema;
 
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware, web, App, HttpServer};
-use diesel::connection::Connection;
 use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
@@ -16,7 +16,6 @@ use hash::SaltedHash;
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use ring::rand::SystemRandom;
-use std::io::Write;
 
 static DATABASE_URL: &'static str = "DATABASE_URL";
 static DOMAIN: &'static str = "DOMAIN";
@@ -49,28 +48,13 @@ where
         .expect("Error inserting new user")
 }
 
-// TODO: needs testing!
-pub fn verify_user<S>(conn: &PooledConnection, username: S, password: S) -> bool
-where
-    S: AsRef<str>,
-{
-    let user: models::User = schema::users::table
-        .filter(schema::users::username.eq(username.as_ref()))
-        .get_result(conn)
-        .expect("user query");
-
-    let mut salt = [0; 32];
-    base64::decode(&user.salt_base64)
-        .expect("base64 decode")
-        .write_all(&mut salt)
-        .expect("write_all");
-
-    SaltedHash {
-        salt,
-        hash: user.argon2_hash.clone().into_bytes(),
-    }
-    .verify(password.as_ref())
-}
+/// API Guide (keep updated!)
+/// - /api/register
+///     - POST { username, password }: register user
+/// - /api/auth
+///     - POST { username, password }: log user in
+///     - DELETE { token }: log user out
+///     - GET { token }: get user data
 
 fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
@@ -99,7 +83,7 @@ fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(cookie_key.as_bytes())
-                    .name("auth")
+                    .name("auth-cookie")
                     .path("/")
                     .domain(domain.as_str())
                     .max_age_time(chrono::Duration::days(1))
@@ -108,10 +92,13 @@ fn main() -> std::io::Result<()> {
             .data(web::JsonConfig::default().limit(4096))
             .service(
                 web::scope("/api")
-                    .service(web::resource("/register").route(web::post().to(resource::register)))
+                    .service(
+                        web::resource("/register")
+                            .route(web::post().to_async(resource::register)),
+                    )
                     .service(
                         web::resource("/auth")
-                            .route(web::post().to(|| {}))
+                            .route(web::post().to_async(resource::login))
                             .route(web::delete().to(|| {}))
                             .route(web::get().to(|| {})),
                     ),

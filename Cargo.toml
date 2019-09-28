@@ -15,6 +15,8 @@ chrono = "0.4"
 diesel = { version = "1.4", features = ["postgres", "uuidv07", "r2d2", "chrono"] }
 dotenv = "0.14"
 env_logger = "0.7"
+failure = "0.1"
+futures = "0.1"
 lazy_static = "1.4"
 log = "0.4"
 ring = "0.14"
