@@ -1,6 +1,7 @@
 use actix_web::{error::BlockingError, HttpResponse};
 use failure::{Error, Fail};
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 pub enum Status {
     Unauthorized = 401,
@@ -88,6 +89,7 @@ where
     construct_error(e, Status::Unauthorized)
 }
 
+#[allow(dead_code)]
 pub fn forbidden<E>(e: E) -> ServiceError
 where
     E: Into<Error>,

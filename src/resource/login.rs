@@ -2,7 +2,7 @@ use crate::{Pool, error::{self, ServiceError}, models};
 use actix_identity::Identity;
 use actix_web::{web, HttpResponse};
 use diesel::prelude::*;
-use log::{error, info};
+use log::info;
 use failure::err_msg;
 use futures::Future;
 use serde::Deserialize;
@@ -36,10 +36,10 @@ pub fn login(
     web::block(|| login_query(params, pool)).then(move |res| match res {
         Ok((user, p)) => {
             if user.verify(&p.password) {
-                identity.remember(user.username);
+                identity.remember(user.username.clone());
+                info!("Logged in user {}", user.username);
                 Ok(HttpResponse::Ok().finish())
             } else {
-                error!("User verification failed.");
                 Err(error::unauthorized(err_msg("User verification failed")))
             }
         }

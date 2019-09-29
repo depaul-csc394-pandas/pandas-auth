@@ -9,12 +9,12 @@ mod schema;
 
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware, web, App, HttpServer};
-use diesel::pg::{Pg, PgConnection};
+use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
 use hash::SaltedHash;
 use lazy_static::lazy_static;
-use log::{error, info, trace, warn};
+use log::{error, info};
 use ring::rand::SystemRandom;
 
 static DATABASE_URL: &'static str = "DATABASE_URL";
@@ -99,7 +99,7 @@ fn main() -> std::io::Result<()> {
                     .service(
                         web::resource("/auth")
                             .route(web::post().to_async(resource::login))
-                            .route(web::delete().to(|| {}))
+                            .route(web::delete().to(resource::logout))
                             .route(web::get().to(|| {})),
                     ),
             )
