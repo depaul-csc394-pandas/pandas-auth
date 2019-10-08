@@ -6,6 +6,7 @@ mod hash;
 mod models;
 mod resource;
 mod schema;
+mod secret;
 
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware, web, App, HttpServer};
@@ -19,8 +20,6 @@ use ring::rand::SystemRandom;
 
 static DATABASE_URL: &'static str = "DATABASE_URL";
 static DOMAIN: &'static str = "DOMAIN";
-static PEPPER: &'static str = "PEPPER";
-static COOKIE_KEY: &'static str = "COOKIE_KEY";
 
 lazy_static! {
     static ref RNG: SystemRandom = SystemRandom::new();
@@ -58,6 +57,7 @@ where
 
 fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
+    std::env::set_var("RUST_LOG", "pandas_auth=info,actix_web=info,diesel=info");
     env_logger::init();
 
     let db_url = match std::env::var(DATABASE_URL) {
@@ -74,15 +74,13 @@ fn main() -> std::io::Result<()> {
         .expect("Pool creation failed.");
     let domain = std::env::var(DOMAIN).unwrap_or("localhost".to_string());
 
-    let cookie_key = std::env::var(COOKIE_KEY).expect("Failed to load COOKIE_KEY");
-
     HttpServer::new(move || {
         info!("Starting HTTP server...");
         App::new()
             .data(pool.clone())
             .wrap(middleware::Logger::default())
             .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(cookie_key.as_bytes())
+                CookieIdentityPolicy::new(&*secret::COOKIE_KEY)
                     .name("auth-cookie")
                     .path("/")
                     .domain(domain.as_str())
@@ -93,8 +91,7 @@ fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/api")
                     .service(
-                        web::resource("/register")
-                            .route(web::post().to_async(resource::register)),
+                        web::resource("/register").route(web::post().to_async(resource::register)),
                     )
                     .service(
                         web::resource("/auth")
@@ -104,7 +101,7 @@ fn main() -> std::io::Result<()> {
                     ),
             )
     })
-    .bind("127.0.0.1:8080")
+    .bind("localhost:8080")
     .unwrap()
     .run()
     .unwrap();

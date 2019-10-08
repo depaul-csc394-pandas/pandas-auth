@@ -1,0 +1,17 @@
+FROM rust:1.38 AS diesel
+WORKDIR /usr/src/pandas-auth
+
+LABEL maintainer="Cormac O'Brien <cormac@c-obrien.org>"
+
+RUN cargo install diesel_cli --no-default-features --features postgres
+
+FROM postgres:latest AS postgres
+WORKDIR /usr/src/pandas-auth
+
+COPY --from=diesel /usr/local/cargo/bin/diesel /usr/bin/
+COPY diesel.toml ./
+COPY src/schema.rs ./src/schema.rs
+COPY migrations ./migrations/
+
+COPY init-db.sh /docker-entrypoint-initdb.d/
+RUN chmod +x /docker-entrypoint-initdb.d/init-db.sh

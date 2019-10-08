@@ -1,0 +1,36 @@
+version: "3.7"
+configs:
+  pandas_auth_config:
+    file: ./.env
+secrets:
+  pandas_auth_pepper:
+    external: true
+    name: pandas_auth_pepper
+  pandas_auth_cookie_key:
+    external: true
+    name: pandas_auth_cookie_key
+services:
+  postgres:
+    image: pandas/auth-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=pandas_auth
+      - DATABASE_URL=postgres://postgres:postgres@localhost/pandas_auth
+    volumes:
+      - pgdata:/var/lib/postgres/data
+  pandas-auth:
+    image: pandas/auth
+    restart: on-failure
+    depends_on: [postgres]
+    ports:
+      - "8080:8080"
+    configs:
+      - pandas_auth_config
+    secrets:
+      - pandas_auth_pepper
+      - pandas_auth_cookie_key
+    working_dir: "/usr/src/pandas-auth"
+    command: ["./wait-for-it.sh", "postgres:5432", "-s", "-t", "60", "--", "pandas-auth"]
+volumes:
+  pgdata:

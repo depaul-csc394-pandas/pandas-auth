@@ -1,0 +1,27 @@
+FROM rust:1.38 AS build
+
+LABEL maintainer="Cormac O'Brien <cormac@c-obrien.org>"
+
+WORKDIR /usr/src/pandas-auth
+
+# building deps in their own layer reduces subsequent build times
+RUN USER=root cargo init --bin && cargo install cargo-build-deps
+COPY Cargo.toml Cargo.lock ./
+RUN cargo build-deps --release
+
+RUN touch .env && \
+  echo "DOMAIN=localhost" >> .env && \
+  echo "DATABASE_URL=postgres://postgres:postgres@postgres/pandas_auth" >> .env
+
+# used in docker-compose.yml to wait for Postgres to come online
+COPY wait-for-it.sh ./
+RUN chmod +x ./wait-for-it.sh
+
+# TODO: enable TLS and change to 443
+EXPOSE 8080
+
+COPY src/ ./src/
+RUN cargo install --path .
+
+CMD ["pandas-auth"]
+
